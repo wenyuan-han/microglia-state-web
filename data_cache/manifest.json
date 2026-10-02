@@ -1,0 +1,16 @@
+{
+  "built_at": "2026-09-30T16:26:21",
+  "source_h5ad": "D:\\PycharmProjects\\DAG-Agent\\Glial_transition\\data\\outputs\\SEAAD_Microglia_State.h5ad",
+  "source_n_cells": 235961,
+  "sampled_cells": 30000,
+  "program_source": "not found",
+  "dag_files": {
+    "dag_v1_edges.csv": true,
+    "dag_v2_edges.csv": true,
+    "edge_evidence.csv": true,
+    "path_evidence.csv": true
+  },
+  "transport_cache": true,
+  "intervention_cache": true,
+  "external_evidence_cache": true
+}
