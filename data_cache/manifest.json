@@ -1,16 +1,43 @@
 {
-  "built_at": "2026-09-30T16:26:21",
+  "built_at": "2026-10-05T15:57:24",
+  "final_pipeline": "DAG-v2 -> STEP34B transport -> STEP35A v2 intervention -> STEP35B external concordance",
   "source_h5ad": "D:\\PycharmProjects\\DAG-Agent\\Glial_transition\\data\\outputs\\SEAAD_Microglia_State.h5ad",
   "source_n_cells": 235961,
   "sampled_cells": 30000,
   "program_source": "not found",
+  "continuous_state_source": "D:\\PycharmProjects\\DAG-Agent\\data\\SEAAD\\processed\\nmf\\continuous_state\\continuous_disease_state.csv",
   "dag_files": {
     "dag_v1_edges.csv": true,
-    "dag_v2_edges.csv": true,
+    "dag_v2_primary_edges.csv": true,
+    "dag_v2_core_intervention_edges.csv": true,
     "edge_evidence.csv": true,
     "path_evidence.csv": true
   },
-  "transport_cache": true,
-  "intervention_cache": true,
-  "external_evidence_cache": true
+  "transport_files": {
+    "pair_metrics.csv": true,
+    "model_metric_means.csv": true,
+    "gain_decomposition.csv": true,
+    "matched_statistics.csv": true
+  },
+  "intervention_files": {
+    "pair_response.csv": true,
+    "program_response.csv": true,
+    "specificity.csv": true,
+    "dose_response.csv": true
+  },
+  "external_files": {
+    "external_program_effects.csv": true,
+    "virtual_program_effects.csv": true,
+    "concordance_by_context.csv": true,
+    "concordance_aggregate.csv": true,
+    "program_level_comparison.csv": true,
+    "specificity_concordance.csv": true,
+    "independent_summary": true,
+    "independent_sources": [
+      "D:\\PycharmProjects\\DAG-Agent\\data\\SEAAD\\processed\\32A_GSE244209_INPP5D_external_validation\\32A_primary_INPP5D_summary.csv",
+      "D:\\PycharmProjects\\DAG-Agent\\data\\SEAAD\\processed\\32B_GSE158469_TREM2_mechanism_validation\\32B_aggregate_topology_summary.csv",
+      "D:\\PycharmProjects\\DAG-Agent\\data\\SEAAD\\processed\\32C_GSE226076_LXR_mechanism_validation\\32C_aggregate_topology_summary.csv",
+      "D:\\PycharmProjects\\DAG-Agent\\data\\SEAAD\\processed\\32D_GSE271192_NLRP3_P7_validation\\32D_aggregate_topology_summary.csv"
+    ]
+  }
 }

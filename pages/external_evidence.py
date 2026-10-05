@@ -1,29 +1,118 @@
+import pandas as pd
+import plotly.express as px
 import streamlit as st
-from core.loaders import load_external_evidence
+
+from core.loaders import (
+    load_external_validation_summary,
+    load_external_program_effects,
+    load_virtual_program_effects,
+    load_concordance_context,
+    load_concordance_aggregate,
+    load_concordance_program,
+    load_concordance_specificity,
+)
 from core.ui import page_header
 
 page_header(
-    "Independent biological validation",
+    "Independent perturbation evidence",
     "External Evidence",
-    "用于集中展示 STEP32A–32D 的独立扰动证据，并与 frozen DAG-v2 hypothesis 对齐。",
+    "汇总 STEP32A–32D 的独立扰动验证，并用 STEP35B 比较 frozen DAG-v2 虚拟机制干预与外部实验的五 Program 响应结构。",
 )
 
-df = load_external_evidence()
+summary = load_external_validation_summary()
+aggregate = load_concordance_aggregate()
+program = load_concordance_program()
+context = load_concordance_context()
+specificity = load_concordance_specificity()
+external_long = load_external_program_effects()
+virtual_long = load_virtual_program_effects()
 
-if df.empty:
-    st.info(
-        "当前尚未生成 `data_cache/external_evidence.parquet`。"
-        "下一步可把 GSE244209、GSE158469、GSE226076、GSE271192 的 summary CSV 统一转换。"
-    )
-    st.markdown(
-        """
-        计划内容：
-        - INPP5D / GSE244209
-        - TREM2 / GSE158469
-        - APOE-LXR / GSE226076
-        - NLRP3 / GSE271192
-        - specificity、context dependence、Program-level effects
-        """
-    )
+if summary.empty and aggregate.empty:
+    st.info("尚未找到 STEP32/35B web cache。请运行 `python webapp/scripts/build_web_data.py`。")
+    st.stop()
+
+if not aggregate.empty:
+    st.markdown("### Virtual ↔ experimental concordance")
+    mechanisms = aggregate["mechanism"].dropna().astype(str).unique().tolist() if "mechanism" in aggregate.columns else []
+    mechanism = st.selectbox("Mechanism", mechanisms) if mechanisms else None
+    a = aggregate[aggregate["mechanism"].astype(str) == mechanism].copy() if mechanism else aggregate.copy()
+
+    profile_options = a["virtual_profile"].dropna().astype(str).unique().tolist() if "virtual_profile" in a.columns else []
+    profile = st.selectbox("Virtual profile", profile_options) if profile_options else None
+    av = a[a["virtual_profile"].astype(str) == profile] if profile else a
+    if not av.empty:
+        row = av.iloc[0]
+        cols = st.columns(4)
+        for col, field, label in [
+            (cols[0], "magnitude_spearman", "Magnitude Spearman"),
+            (cols[1], "magnitude_cosine_l1", "Magnitude cosine"),
+            (cols[2], "virtual_specificity", "Virtual specificity"),
+            (cols[3], "external_specificity_recomputed_DAGv2", "External specificity"),
+        ]:
+            if field in row.index and pd.notna(row[field]):
+                col.metric(label, f"{float(row[field]):.3f}")
+
+    if mechanism and not program.empty:
+        p = program[program["mechanism"].astype(str) == mechanism].copy()
+        if profile and "virtual_profile" in p.columns:
+            p = p[p["virtual_profile"].astype(str) == profile]
+        contrasts = p["external_contrast"].dropna().astype(str).unique().tolist() if "external_contrast" in p.columns else []
+        contrast = st.selectbox("External contrast", contrasts) if contrasts else None
+        if contrast:
+            p = p[p["external_contrast"].astype(str) == contrast]
+        if {"virtual_abs_l1_fraction", "external_abs_l1_fraction", "program"}.issubset(p.columns):
+            long = p.melt(
+                id_vars=["program"],
+                value_vars=["virtual_abs_l1_fraction", "external_abs_l1_fraction"],
+                var_name="source",
+                value_name="relative_response",
+            )
+            long["source"] = long["source"].map({
+                "virtual_abs_l1_fraction": "Virtual",
+                "external_abs_l1_fraction": "Experimental",
+            })
+            fig = px.bar(long, x="program", y="relative_response", color="source", barmode="group", title="Five-Program response structure")
+            fig.update_layout(height=440, yaxis_title="L1-normalized |ΔProgram|")
+            st.plotly_chart(fig, use_container_width=True)
+
+            scatter = px.scatter(
+                p, x="external_abs_l1_fraction", y="virtual_abs_l1_fraction", text="program",
+                title="Virtual vs experimental Program response",
+            )
+            scatter.update_traces(textposition="top center", marker={"size": 11})
+            scatter.update_layout(height=420, xaxis_title="Experimental relative |ΔProgram|", yaxis_title="Virtual relative |ΔProgram|")
+            st.plotly_chart(scatter, use_container_width=True)
+
+st.markdown("### Independent validation datasets")
+if summary.empty:
+    st.caption("Independent STEP32 summary cache not available.")
 else:
-    st.dataframe(df, use_container_width=True, hide_index=True)
+    datasets = summary["dataset"].dropna().astype(str).unique().tolist() if "dataset" in summary.columns else []
+    if datasets:
+        tabs = st.tabs(datasets)
+        for tab, ds in zip(tabs, datasets):
+            with tab:
+                st.dataframe(summary[summary["dataset"].astype(str) == ds], use_container_width=True, hide_index=True)
+    else:
+        st.dataframe(summary, use_container_width=True, hide_index=True)
+
+with st.expander("Context-level concordance"):
+    if not context.empty:
+        st.dataframe(context, use_container_width=True, hide_index=True)
+
+with st.expander("Specificity concordance"):
+    if not specificity.empty:
+        st.dataframe(specificity, use_container_width=True, hide_index=True)
+
+with st.expander("Standardized external / virtual Program effects"):
+    c1, c2 = st.columns(2)
+    with c1:
+        st.caption("External")
+        if not external_long.empty:
+            st.dataframe(external_long, use_container_width=True, hide_index=True)
+    with c2:
+        st.caption("Virtual")
+        if not virtual_long.empty:
+            st.dataframe(virtual_long, use_container_width=True, hide_index=True)
+
+st.caption("GSE289721 is treated as perturbation calibration/internal interventional benchmarking in the pipeline; STEP32 datasets provide the independent external evidence layer.")

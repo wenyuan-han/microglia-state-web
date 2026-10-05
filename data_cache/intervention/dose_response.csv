@@ -1,0 +1,5 @@
+mechanism,mechanism_short,n_nonfactual_alpha_levels,spearman_abs_alpha_minus_1_vs_response_l1,spearman_abs_alpha_minus_1_vs_specificity_excess,min_specificity_excess_across_alpha,all_alpha_specificity_excess_positive,max_response_alpha
+NLRP3_INFLAMMASOME,NLRP3,4,0.4472135954999579,-0.4472135954999579,0.6051185435933737,True,0.0
+TFEB_LYSOSOME,TFEB,4,0.4472135954999579,0.0,0.4224825544666294,True,0.0
+TREM2_SYK_PHAGOCYTIC,TREM2/SYK,4,0.8944271909999159,0.8944271909999159,0.3763165926830045,True,0.0
+APOE_LXR_LIPID,APOE/LXR,4,0.4472135954999579,0.8944271909999159,0.6361462219224299,True,0.0

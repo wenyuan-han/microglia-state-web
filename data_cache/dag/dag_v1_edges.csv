@@ -1,0 +1,14 @@
+source,target,edge_type,status,evidence_weight
+INPP5D,NLRP3,gene_to_mechanism,CANDIDATE,0.6
+INPP5D,TFEB,gene_to_mechanism,CANDIDATE,0.6
+INPP5D,TREM2/SYK,gene_to_mechanism,CONTEXT_SUPPORTED_CANDIDATE,0.65
+MS4A6A,TFEB,gene_to_mechanism,UNRESOLVED,0.25
+MS4A6A,TREM2/SYK,gene_to_mechanism,UNRESOLVED,0.25
+RABEP1,APOE/LXR,gene_to_mechanism,DISCORDANT,0.0
+NLRP3,P7,mechanism_to_program,WEAK_CONTEXT_CANDIDATE,0.5
+TFEB,P4,mechanism_to_program,CANDIDATE,0.55
+TFEB,P10,mechanism_to_program,CANDIDATE,0.55
+TREM2/SYK,P4,mechanism_to_program,CONTEXT_SUPPORTED_CANDIDATE,0.7
+TREM2/SYK,P1,mechanism_to_program,CONTEXT_SUPPORTED_CANDIDATE,0.7
+APOE/LXR,P1,mechanism_to_program,DISCORDANT,0.0
+APOE/LXR,P6,mechanism_to_program,EXTERNALLY_SUPPORTED_CANDIDATE,0.85

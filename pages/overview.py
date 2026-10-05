@@ -28,8 +28,7 @@ c4.metric("Frozen DAG-v2 edges", f"{len(dag):,}")
 st.markdown("### Research workflow")
 st.markdown(
     """
-    **SEA-AD → Microglia Programs → Continuous state → Evidence-audited DAG → "
-    "Distribution transport → Frozen DAG-v2 → Virtual intervention**
+    **SEA-AD → Microglia Programs → Continuous state → Evidence-audited hierarchical graph → Frozen DAG-v2 → Distribution transport → Mechanism-transmission intervention → External concordance**
     """
 )
 

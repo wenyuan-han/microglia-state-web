@@ -79,3 +79,24 @@ http://localhost:8501
 - 第一版不实时调用 GPU。
 - DAG-v2 只读取 frozen STEP33 输出，不在网页内重新选边。
 - “trajectory” 表述应理解为 pathology-associated model-implied state path，而非纵向细胞追踪。
+
+## Final DAG-v2 web-data workflow
+
+The Streamlit app never trains CFM or runs large SEA-AD analyses online. Build the web cache locally from the completed scientific outputs:
+
+```powershell
+cd D:\PycharmProjects\DAG-Agent
+python webapp\scripts\build_web_data.py
+python webapp\scripts\verify_web_cache.py
+cd webapp
+streamlit run app.py
+```
+
+Final page sources:
+
+- Mechanistic DAG: STEP33 frozen DAG-v2 primary/core + DAG-v1 audit
+- State Transport: STEP34B
+- Virtual Intervention: STEP35A v2
+- External Evidence: STEP32A-D + STEP35B
+
+The generated web-ready files live under `webapp/data_cache/` and should be committed to the web repository when deploying on Streamlit Community Cloud. Do not commit the large source h5ad or model checkpoints to the web repository.
