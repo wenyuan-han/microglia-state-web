@@ -17,7 +17,6 @@ from core.ui import inject_global_css, init_session_state
 
 inject_global_css()
 init_session_state()
-
 pages = {
     "Overview": [
         st.Page("pages/overview.py", title="Overview", icon=":material/home:", default=True),
@@ -27,6 +26,7 @@ pages = {
         st.Page("pages/dag_explorer.py", title="Mechanistic DAG", icon=":material/account_tree:"),
     ],
     "Model": [
+        st.Page("pages/data_simulation.py", title="Data & Simulation", icon=":material/biotech:"),
         st.Page("pages/state_transport.py", title="State Transport", icon=":material/route:"),
         st.Page("pages/virtual_intervention.py", title="Virtual Intervention", icon=":material/tune:"),
     ],
@@ -34,6 +34,5 @@ pages = {
         st.Page("pages/external_evidence.py", title="External Evidence", icon=":material/science:"),
     ],
 }
-
 navigation = st.navigation(pages, position="sidebar")
 navigation.run()
