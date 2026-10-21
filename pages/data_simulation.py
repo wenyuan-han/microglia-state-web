@@ -1,6 +1,7 @@
 """User-uploaded h5ad preview and bounded exploratory simulations."""
 from pathlib import Path
 import shutil
+import logging
 import tempfile
 
 import pandas as pd
@@ -193,8 +194,10 @@ if st.button("运行模拟", type="primary"):
             st.session_state[KEY_RESULT] = result
             st.success("模拟完成。可以在下方查看和下载结果。")
         except Exception as exc:
+            logging.exception("Microglia simulation failed (mode=%s)", mode)
             st.session_state.pop(KEY_RESULT, None)
             st.error(f"模拟失败：{exc}")
+            st.caption("详细异常已写入 Streamlit Cloud 的 Manage app → Logs。")
 
 result = st.session_state.get(KEY_RESULT)
 if result:
@@ -242,7 +245,8 @@ if result:
         )
     st.info(
         "输出文件 X 为模拟后的非负 log1p 表达矩阵，layers['original_log1p'] 保留采样前数据；"
-        "obs 保留源细胞标签并附加模拟信息。该文件不可作为真实干预、纵向轨迹或早筛有效性的证据。"
+        "obs 仅保留疾病分期、供体等必要的安全注释及模拟信息；不复制其余原始元数据。"
+        "该文件不可作为真实干预、纵向轨迹或早筛有效性的证据。"
     )
 
 st.divider()

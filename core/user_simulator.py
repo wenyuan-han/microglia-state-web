@@ -371,6 +371,48 @@ def _subset_rows(obs: pd.DataFrame, stage_col: Optional[str],
     return np.flatnonzero(mask)
 
 
+
+def _build_safe_export_metadata(adata, source_rows, gene_indices, display_genes,
+                                stage_col=None, filter_col=None):
+    """Construct a minimal, predictable AnnData metadata schema for h5ad export.
+
+    The input may contain heterogeneous columns, nested values and names such as
+    ``QC/pass``; only selected scalar biological labels are copied. This avoids
+    HDF5 group-key issues without renaming gene IDs or changing expression.
+    """
+    source_obs = adata.obs.iloc[source_rows]
+    out_obs = pd.DataFrame(index=pd.Index(source_obs.index.astype(str)).rename(None))
+
+    semantic_columns = {
+        "disease_stage": [stage_col, "disease_stage", "Overall AD neuropathological Change",
+                          "AD stage", "stage"],
+        "donor_id": ["Donor ID", "donor_id", "donor", "Donor"],
+        "brain_region": ["Brain Region", "brain_region", "Region", "region"],
+        "cell_type": ["cell_type", "Celltype", "Cell Type", "Subclass"],
+        "sample_id": ["sample_id", "Sample ID", "sample"],
+    }
+    kept = {}
+    for dest, possibilities in semantic_columns.items():
+        source_name = next((c for c in possibilities if c and c in source_obs.columns), None)
+        if source_name is not None:
+            # Convert to plain strings so complex categorical metadata doesn't
+            # carry extra HDF5 groups/categories into this small output file.
+            out_obs[dest] = source_obs[source_name].astype("string").fillna("").to_numpy(dtype=str)
+            kept[dest] = str(source_name)
+
+    if filter_col and filter_col in source_obs.columns:
+        out_obs["selected_filter_value"] = (
+            source_obs[filter_col].astype("string").fillna("").to_numpy(dtype=str)
+        )
+        kept["selected_filter_value"] = str(filter_col)
+
+    out_var = pd.DataFrame(index=pd.Index(
+        adata.var_names[gene_indices].astype(str)).rename(None)
+    )
+    out_var["gene_symbol"] = [str(x) for x in display_genes]
+    return out_obs, out_var, kept
+
+
 def run_simulation(
     path: str, output_path: str, *, mode: str,
     input_kind: str = "log1p", stage_col: Optional[str] = None,
@@ -454,20 +496,30 @@ def run_simulation(
         gene_summary["abs_change"] = gene_summary["simulated_minus_source"].abs()
         gene_summary = gene_summary.sort_values("abs_change", ascending=False).reset_index(drop=True)
         embedding = _embedding({"Source": source, "Simulated": simulated, "Target reference": target}, seed)
-        out_obs = adata.obs.iloc[source_rows].copy()
-        out_obs["simulated_mode"] = mode
+        out_obs, out_var, preserved_columns = _build_safe_export_metadata(
+            adata, source_rows, gene_indices, display_genes,
+            stage_col=stage_col, filter_col=filter_col,
+        )
+        out_obs["simulated_mode"] = str(mode)
         out_obs["simulation_strength"] = float(strength)
         if mode == "stage_mean_shift":
             out_obs["simulated_target_stage"] = str(target_stage)
         else:
             out_obs["simulated_target_gene"] = str(focus_gene)
-        out_var = adata.var.iloc[gene_indices].copy()
+        # Export schema intentionally omits other original obs/var columns;
+        # upload source is left untouched. Data values are never guessed.
         out = ad.AnnData(
             X=simulated.astype(np.float32),
             obs=out_obs,
             var=out_var,
         )
         out.layers["original_log1p"] = source.astype(np.float32)
+        out.uns["export_metadata_policy"] = "essential_scalar_annotations_only"
+        out.uns["preserved_metadata_columns"] = ", ".join(
+            f"{k} <- {v}" for k, v in preserved_columns.items()
+        )
+        out.uns["original_source_stage_column"] = str(stage_col or "")
+        out.uns["original_filter_column"] = str(filter_col or "")
         out.uns["simulation_method"] = mode
         out.uns["interpretation_warning"] = description
         out.uns["input_expression_interpretation"] = input_kind
@@ -475,7 +527,7 @@ def run_simulation(
         out.uns["simulation_seed"] = int(seed)
         out.uns["n_reference_target_cells"] = int(len(target_rows))
         out.uns["n_genes_used"] = int(len(gene_indices))
-        out.uns["simulator_version"] = "exploratory-1.1-gene-resolution"
+        out.uns["simulator_version"] = "exploratory-1.2-safe-h5ad-export"
         gene_resolution = None
         if resolved_gene is not None:
             gene_resolution = (
@@ -485,8 +537,15 @@ def run_simulation(
             out.uns["resolved_gene_query"] = str(focus_gene).strip()
             out.uns["resolved_gene_var_name"] = resolved_gene.var_name
             out.uns["resolved_gene_match_column"] = resolved_gene.match_column
-        Path(output_path).parent.mkdir(parents=True, exist_ok=True)
-        out.write_h5ad(str(output_path), compression="gzip")
+        final_path = Path(output_path)
+        final_path.parent.mkdir(parents=True, exist_ok=True)
+        temp_path = final_path.with_name(final_path.stem + ".partial.h5ad")
+        try:
+            out.write_h5ad(str(temp_path), compression="gzip")
+            temp_path.replace(final_path)
+        finally:
+            # Never leave a half-written h5ad masquerading as a valid output.
+            temp_path.unlink(missing_ok=True)
         return SimulationResult(
             output_path=str(output_path), mode=mode,
             n_source=len(source_rows), n_target=len(target_rows),
