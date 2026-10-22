@@ -11,12 +11,12 @@ from core.loaders import (
     load_concordance_program,
     load_concordance_specificity,
 )
-from core.ui import page_header
+from core.ui import page_header, apply_figure_style, footer
 
 page_header(
     "Independent perturbation evidence",
     "External Evidence",
-    "汇总 STEP32A–32D 的独立扰动验证，并用 STEP35B 比较 frozen DAG-v2 虚拟机制干预与外部实验的五 Program 响应结构。",
+    "Review independent perturbation evidence and compare five-program response patterns between virtual DAG-v2 interventions and external experiments.",
 )
 
 summary = load_external_validation_summary()
@@ -28,7 +28,7 @@ external_long = load_external_program_effects()
 virtual_long = load_virtual_program_effects()
 
 if summary.empty and aggregate.empty:
-    st.info("尚未找到 STEP32/35B web cache。请运行 `python webapp/scripts/build_web_data.py`。")
+    st.info("External evidence is not available. Build the local cache with `python webapp/scripts/build_web_data.py`.")
     st.stop()
 
 if not aggregate.empty:
@@ -73,7 +73,7 @@ if not aggregate.empty:
             })
             fig = px.bar(long, x="program", y="relative_response", color="source", barmode="group", title="Five-Program response structure")
             fig.update_layout(height=440, yaxis_title="L1-normalized |ΔProgram|")
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(apply_figure_style(fig), width="stretch")
 
             scatter = px.scatter(
                 p, x="external_abs_l1_fraction", y="virtual_abs_l1_fraction", text="program",
@@ -81,7 +81,7 @@ if not aggregate.empty:
             )
             scatter.update_traces(textposition="top center", marker={"size": 11})
             scatter.update_layout(height=420, xaxis_title="Experimental relative |ΔProgram|", yaxis_title="Virtual relative |ΔProgram|")
-            st.plotly_chart(scatter, use_container_width=True)
+            st.plotly_chart(apply_figure_style(scatter), width="stretch")
 
 st.markdown("### Independent validation datasets")
 if summary.empty:
@@ -92,27 +92,29 @@ else:
         tabs = st.tabs(datasets)
         for tab, ds in zip(tabs, datasets):
             with tab:
-                st.dataframe(summary[summary["dataset"].astype(str) == ds], use_container_width=True, hide_index=True)
+                st.dataframe(summary[summary["dataset"].astype(str) == ds], width="stretch", hide_index=True)
     else:
-        st.dataframe(summary, use_container_width=True, hide_index=True)
+        st.dataframe(summary, width="stretch", hide_index=True)
 
 with st.expander("Context-level concordance"):
     if not context.empty:
-        st.dataframe(context, use_container_width=True, hide_index=True)
+        st.dataframe(context, width="stretch", hide_index=True)
 
 with st.expander("Specificity concordance"):
     if not specificity.empty:
-        st.dataframe(specificity, use_container_width=True, hide_index=True)
+        st.dataframe(specificity, width="stretch", hide_index=True)
 
 with st.expander("Standardized external / virtual Program effects"):
     c1, c2 = st.columns(2)
     with c1:
         st.caption("External")
         if not external_long.empty:
-            st.dataframe(external_long, use_container_width=True, hide_index=True)
+            st.dataframe(external_long, width="stretch", hide_index=True)
     with c2:
         st.caption("Virtual")
         if not virtual_long.empty:
-            st.dataframe(virtual_long, use_container_width=True, hide_index=True)
+            st.dataframe(virtual_long, width="stretch", hide_index=True)
 
 st.caption("GSE289721 is treated as perturbation calibration/internal interventional benchmarking in the pipeline; STEP32 datasets provide the independent external evidence layer.")
+
+footer()

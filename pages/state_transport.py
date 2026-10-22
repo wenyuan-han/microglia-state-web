@@ -8,12 +8,12 @@ from core.loaders import (
     load_transport_gain_decomposition,
     load_transport_statistics,
 )
-from core.ui import page_header
+from core.ui import page_header, apply_figure_style, footer
 
 page_header(
     "Frozen DAG-v2 generative audit",
     "State Transport",
-    "展示 STEP34B 的 matched distribution-level transport：Frozen no-graph Base、DAG-v1、证据校准 DAG-v2 与 degree-matched Rewired-v2。SEA-AD 为横断面数据，因此这里表示分布输运而非同一细胞的纵向轨迹。",
+    "Compare held-out distribution transport across Base, DAG-v1, evidence-calibrated DAG-v2, and rewired graph controls. This is cross-sectional distribution modeling, not longitudinal cell tracking.",
 )
 
 model_df = load_transport_model_metrics()
@@ -22,7 +22,7 @@ gain_df = load_transport_gain_decomposition()
 stats_df = load_transport_statistics()
 
 if model_df.empty and pair_df.empty:
-    st.info("尚未找到 STEP34B web cache。请在本地运行 `python webapp/scripts/build_web_data.py` 后重新部署。")
+    st.info("Transport results are not available. Build the local cache with `python webapp/scripts/build_web_data.py`.")
     st.stop()
 
 # Prefer the already aggregated STEP34B table.
@@ -44,7 +44,7 @@ if not model_df.empty and {"model", "metric"}.issubset(model_df.columns):
     if value_col:
         fig = px.bar(sub, x="model", y=value_col, text_auto=".4f", title=f"Held-out mean: {metric}")
         fig.update_layout(height=420, xaxis_title="Model", yaxis_title=metric)
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(apply_figure_style(fig), width="stretch")
 
         cols = st.columns(min(4, max(1, len(sub))))
         for col, (_, row) in zip(cols, sub.head(len(cols)).iterrows()):
@@ -54,7 +54,7 @@ else:
 
 st.markdown("### Gain decomposition")
 if gain_df.empty:
-    st.caption("34B_gain_decomposition.csv 未进入 cache。")
+    st.caption("Gain decomposition is not available in this cache.")
 else:
     # STEP34B defines positive gain as improvement; keep the original columns visible.
     numeric_cols = [c for c in gain_df.columns if pd.api.types.is_numeric_dtype(gain_df[c])]
@@ -64,13 +64,13 @@ else:
             long = gain_df.melt(id_vars=["metric"], value_vars=melt_cols, var_name="gain_type", value_name="gain")
             fig = px.bar(long, x="metric", y="gain", color="gain_type", barmode="group")
             fig.update_layout(height=440, xaxis_title="", yaxis_title="Positive = improvement")
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(apply_figure_style(fig), width="stretch")
     with st.expander("Show gain decomposition table"):
-        st.dataframe(gain_df, use_container_width=True, hide_index=True)
+        st.dataframe(gain_df, width="stretch", hide_index=True)
 
 st.markdown("### Matched uncertainty / significance")
 if stats_df.empty:
-    st.caption("34B_matched_statistics.csv 未进入 cache。")
+    st.caption("Matched statistics are not available in this cache.")
 else:
     display_cols = [
         c for c in [
@@ -80,11 +80,11 @@ else:
             "p_value", "permutation_p", "n_pairs",
         ] if c in stats_df.columns
     ]
-    st.dataframe(stats_df[display_cols] if display_cols else stats_df, use_container_width=True, hide_index=True)
+    st.dataframe(stats_df[display_cols] if display_cols else stats_df, width="stretch", hide_index=True)
 
 with st.expander("Pair-level audit data"):
     if pair_df.empty:
-        st.caption("34B_pair_metrics.csv 未进入 cache。")
+        st.caption("Pair-level metrics are not available in this cache.")
     else:
         model_options = pair_df["model"].dropna().astype(str).unique().tolist() if "model" in pair_df.columns else []
         if model_options:
@@ -92,6 +92,8 @@ with st.expander("Pair-level audit data"):
             view = pair_df[pair_df["model"].astype(str).isin(chosen)] if chosen else pair_df
         else:
             view = pair_df
-        st.dataframe(view.head(2000), use_container_width=True, hide_index=True)
+        st.dataframe(view.head(2000), width="stretch", hide_index=True)
 
 st.caption("Interpretation: graph-structured residual capacity and exact topology are reported separately; this page does not treat cross-sectional donor pairs as observed longitudinal cell trajectories.")
+
+footer()

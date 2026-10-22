@@ -108,7 +108,7 @@ def _ensembl_root(s: str) -> str:
 def _resolve_gene(adata, gene: str) -> GeneResolution:
     query = str(gene or "").strip()
     if not query:
-        raise ValueError("请输入基因符号或基因 ID。")
+        raise ValueError("Enter a gene symbol or gene ID.")
     var_names = _to_gene_strings(adata.var_names)
     columns = _gene_annotation_columns(adata.var)
 
@@ -132,8 +132,8 @@ def _resolve_gene(adata, gene: str) -> GeneResolution:
                 samples = ", ".join(var_names[matching[:5]])
                 source = "var_names" if col is None else f"var[{col!r}]"
                 raise ValueError(
-                    f"基因 {query!r} 在 {source} 中匹配到 {len(matching)} 个表达列（{samples}）。"
-                    "存在歧义，请用唯一的 var_names/Ensembl ID 指定要编辑的基因。"
+                    f"Gene {query!r} matches {len(matching)} expression columns in {source} ({samples}). "
+                    "The match is ambiguous. Specify a unique var_name or Ensembl ID."
                 )
             if len(matching) == 1:
                 idx = int(matching[0])
@@ -153,14 +153,14 @@ def _resolve_gene(adata, gene: str) -> GeneResolution:
                     found_raw = True
                     break
         if found_raw:
-            raw_hint = ("该基因存在于 adata.raw 中，但当前模拟只读取 adata.X；"
-                        "请在本地导出包含该基因的 X 矩阵后重新上传。")
+            raw_hint = ("This gene is present in adata.raw, but the simulator uses adata.X. "
+                        "Export an X matrix containing the gene and upload it again.")
     sample = ", ".join(var_names[:6])
-    col_hint = ", ".join(columns[:8]) if columns else "未发现"
+    col_hint = ", ".join(columns[:8]) if columns else "None found"
     raise ValueError(
-        f"基因 {query!r} 未在当前 adata.X 对应的 var_names 或基因注释列中找到。"
-        f"var_names 示例：{sample}；可搜索注释列：{col_hint}。"
-        + (raw_hint or "如果数据已裁剪为 HVG 子集，必须使用包含该基因的原始表达矩阵。")
+        f"Gene {query!r} was not found in var_names or supported annotations for adata.X. "
+        f"Example var_names: {sample}; searchable columns: {col_hint}. "
+        + (raw_hint or "If the gene was removed by HVG selection, upload an expression matrix that includes it.")
     )
 
 
@@ -223,7 +223,7 @@ def _dense(matrix) -> np.ndarray:
         matrix = matrix.toarray()
     arr = np.asarray(matrix, dtype=np.float32)
     if arr.ndim != 2:
-        raise ValueError("表达矩阵应为二维（细胞 × 基因）。")
+        raise ValueError("Expression data must be a 2D cells-by-genes matrix.")
     return arr
 
 
@@ -287,28 +287,28 @@ def _choose_genes(adata, rows: np.ndarray, max_genes: int, focus_index: Optional
 def _expression_to_log(adata, rows: np.ndarray, genes: np.ndarray, input_kind: str) -> np.ndarray:
     X = _get_rows(adata, rows, genes)
     if not np.isfinite(X).all():
-        raise ValueError("数据包含 NaN 或无穷值，请先在本地清洗。")
+        raise ValueError("Input contains NaN or infinity; clean it locally first.")
     if np.min(X) < -1e-6:
-        raise ValueError("X 存在负值，可能已做 z-score / scale；请上传 counts 或非负 log1p 矩阵。")
+        raise ValueError("adata.X contains negative values. Upload raw counts or non-negative log1p expression, not scaled data.")
     if input_kind == "counts":
         # Validation: integer-like counts; use true full-matrix library totals.
         if (np.abs(X - np.rint(X)) > 1e-3).mean() > 0.001:
-            raise ValueError("当前选择的是 raw counts，但 X 含大量小数。请确认数据类型。")
+            raise ValueError("Raw counts were selected, but many X values are non-integers. Check the input expression type.")
         depth = _library_sizes(adata, rows)
         if not np.isfinite(depth).all() or (depth <= 0).any():
-            raise ValueError("部分细胞的原始总计数为零或非数值，请在本地先进行 QC。")
+            raise ValueError("Some cells have zero or invalid total counts. Apply QC before uploading.")
         X = np.log1p(X / depth[:, None] * 10000.0)
     elif input_kind != "log1p":
-        raise ValueError("只支持 counts 或 log1p 非负表达。")
+        raise ValueError("Only raw counts or non-negative log1p expression is supported.")
     if not np.isfinite(X).all():
-        raise ValueError("表达值转换后包含无效数值。")
+        raise ValueError("Expression conversion produced invalid values.")
     return X.astype(np.float32, copy=False)
 
 
 def mean_shift(source: np.ndarray, target: np.ndarray, strength: float) -> np.ndarray:
     """Unpaired, unadjusted distribution mean shift (NOT causal transport)."""
     if len(source) == 0 or len(target) == 0:
-        raise ValueError("Source 和 target 都必须包含细胞。")
+        raise ValueError("Both source and target groups must contain cells.")
     delta = np.mean(target, axis=0) - np.mean(source, axis=0)
     return np.maximum(0.0, source + np.float32(strength) * delta).astype(np.float32)
 
@@ -316,13 +316,13 @@ def mean_shift(source: np.ndarray, target: np.ndarray, strength: float) -> np.nd
 def edit_single_gene(source: np.ndarray, gene_index: int, multiplier: float) -> np.ndarray:
     """Direct edit of a single log1p expression column; no network response."""
     if not (0 <= gene_index < source.shape[1]):
-        raise ValueError("Gene index 无效。")
+        raise ValueError("Invalid gene index.")
     if not (0 <= multiplier <= 3):
-        raise ValueError("表达倍数需在 0 到 3 之间。")
+        raise ValueError("Expression multiplier must be between 0 and 3.")
     result = source.copy()
     x = source[:, gene_index].astype(np.float64)
     if x.max(initial=0) > 30:
-        raise ValueError("log1p 表达值过大；请检查是否把 raw counts 当成 log1p。")
+        raise ValueError("Log1p values are unexpectedly large. Check whether raw counts were mislabeled as log1p.")
     result[:, gene_index] = np.log1p(np.expm1(x) * multiplier).astype(np.float32)
     return result
 
@@ -426,39 +426,39 @@ def run_simulation(
     if mode not in ("stage_mean_shift", "single_gene_edit"):
         raise ValueError("Unknown simulation mode")
     if max_cells < MIN_REFERENCE_CELLS or max_cells > MAX_CELLS_PER_GROUP:
-        raise ValueError("采样细胞数超出允许范围。")
+        raise ValueError("Sample size is outside the permitted range.")
     if max_genes < 20 or max_genes > MAX_GENES:
-        raise ValueError("基因数超出允许范围。")
+        raise ValueError("Gene count is outside the permitted range.")
     if not np.isfinite(strength):
-        raise ValueError("模拟强度必须是有限数值。")
+        raise ValueError("Simulation strength must be finite.")
     if mode == "stage_mean_shift" and not (0 <= strength <= 1.5):
-        raise ValueError("阶段均值迁移的强度范围为 0 到 1.5。")
+        raise ValueError("Stage shift strength must be between 0 and 1.5.")
     rng = np.random.default_rng(seed)
     with _open_h5ad(path) as adata:
         if not adata.var_names.is_unique:
-            raise ValueError("var_names 有重复基因名；请先在本地调用 adata.var_names_make_unique()。")
+            raise ValueError("Duplicate gene identifiers in var_names. Apply adata.var_names_make_unique() locally.")
         if stage_col and stage_col not in adata.obs.columns:
-            raise ValueError("疾病阶段列不在 obs 中。")
+            raise ValueError("Selected disease-stage variable is absent from obs.")
         if filter_col and filter_col not in adata.obs.columns:
-            raise ValueError("筛选列不在 obs 中。")
+            raise ValueError("Selected filter variable is absent from obs.")
         if mode == "stage_mean_shift":
             if not stage_col or not source_stage or not target_stage:
-                raise ValueError("阶段模拟必须选择 disease stage 列、source 和 target。")
+                raise ValueError("Stage mean shift requires a disease-stage variable, source group, and target group.")
             if source_stage == target_stage:
-                raise ValueError("source 和 target 阶段应不同。")
+                raise ValueError("Source and target groups must be different.")
         if mode == "single_gene_edit" and not focus_gene:
-            raise ValueError("单基因编辑需要提供基因名。")
+            raise ValueError("Single-gene editing requires a gene identifier.")
         source_all = _subset_rows(adata.obs, stage_col, source_stage,
                                   filter_col, filter_value)
         if len(source_all) < MIN_REFERENCE_CELLS:
-            raise ValueError(f"Source 仅有 {len(source_all)} 个细胞；至少需要 {MIN_REFERENCE_CELLS} 个。")
+            raise ValueError(f"Source has {len(source_all)} cells; at least {MIN_REFERENCE_CELLS} are required.")
         source_rows = np.sort(rng.choice(source_all, size=min(max_cells, len(source_all)), replace=False))
         target_rows = np.asarray([], dtype=int)
         if mode == "stage_mean_shift":
             target_all = _subset_rows(adata.obs, stage_col, target_stage,
                                       filter_col, filter_value)
             if len(target_all) < MIN_REFERENCE_CELLS:
-                raise ValueError(f"Target 仅有 {len(target_all)} 个细胞；至少需要 {MIN_REFERENCE_CELLS} 个。")
+                raise ValueError(f"Target has {len(target_all)} cells; at least {MIN_REFERENCE_CELLS} are required.")
             target_rows = np.sort(rng.choice(target_all, size=min(max_cells, len(target_all)), replace=False))
         resolved_gene = (_resolve_gene(adata, focus_gene)
                          if mode == "single_gene_edit" else None)
@@ -473,15 +473,15 @@ def run_simulation(
         if mode == "stage_mean_shift":
             simulated = mean_shift(source, target, strength)
             description = (
-                "探索性阶段均值迁移：对每个基因使用未配对、未做协变量校正的 "
-                "target_mean - source_mean 平移；这不是训练模型推理、因果干预或真实细胞状态预测。"
+                "Exploratory stage mean shift: applies an unpaired, unadjusted "
+                "target_mean minus source_mean shift per gene; not a trained model, causal effect, or actual cell-state forecast."
             )
         else:
             index = int(np.flatnonzero(gene_indices == resolved_gene.index)[0])
             simulated = edit_single_gene(source, index, strength)
             description = (
-                "单基因表达数值编辑：仅修改所选基因的 log1p 表达值，"
-                "其他基因保持不变；不代表 CRISPR 或药物的下游生物学响应。"
+                "Numerical single-gene edit: changes only the selected gene's log1p expression; "
+                "all other genes are unchanged. No CRISPR or drug downstream response is inferred."
             )
         gene_summary = pd.DataFrame({
             "gene": display_genes,

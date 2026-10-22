@@ -8,12 +8,12 @@ from core.loaders import (
     load_intervention_dose_response,
     load_intervention_pair_response,
 )
-from core.ui import page_header
+from core.ui import page_header, apply_figure_style, footer
 
 page_header(
     "Frozen DAG-v2 mechanism-transmission audit",
     "Virtual Intervention",
-    "STEP35A v2：在不重新训练模型的情况下，对 frozen DAG-v2 的 Mechanism→Program 传递进行 α 调制。α=1 为 factual，0 为完全阻断，0.5 为部分抑制，1.5/2.0 为增强。",
+    "Adjust mechanism-to-program transmission strength in the frozen DAG-v2 model. α=1 is the reference; lower values suppress transmission and higher values amplify it.",
 )
 
 program_df = load_intervention_program_response()
@@ -22,7 +22,7 @@ dose_df = load_intervention_dose_response()
 pair_df = load_intervention_pair_response()
 
 if program_df.empty:
-    st.info("尚未找到 STEP35A v2 cache。请运行 `python webapp/scripts/build_web_data.py`。")
+    st.info("Intervention results are not available. Build the local cache with `python webapp/scripts/build_web_data.py`.")
     st.stop()
 
 mechanism_col = "mechanism_short" if "mechanism_short" in program_df.columns else "mechanism"
@@ -49,7 +49,7 @@ if not view.empty and {"program", "mean_signed_delta_program"}.issubset(view.col
     )
     fig.add_hline(y=0, line_width=1)
     fig.update_layout(height=440, xaxis_title="Program", yaxis_title="Δ Program vs factual α=1")
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(apply_figure_style(fig), width="stretch")
 
     c1, c2, c3 = st.columns(3)
     if "mean_abs_delta_program" in view.columns:
@@ -77,24 +77,26 @@ if not spec_df.empty:
             if field in row.index and pd.notna(row[field]):
                 col.metric(label, f"{float(row[field]):.3f}")
         with st.expander("Specificity statistics"):
-            st.dataframe(s, use_container_width=True, hide_index=True)
+            st.dataframe(s, width="stretch", hide_index=True)
 
 st.markdown("### Dose / transmission response")
 mech_program = program_df[program_df[mechanism_col].astype(str) == mechanism].copy()
 if {"alpha", "program", "mean_abs_delta_program"}.issubset(mech_program.columns):
     fig = px.line(mech_program, x="alpha", y="mean_abs_delta_program", color="program", markers=True)
     fig.update_layout(height=420, yaxis_title="Mean |ΔProgram|", xaxis_title="Transmission α")
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(apply_figure_style(fig), width="stretch")
 
 if not dose_df.empty:
     with st.expander("Dose-response summary"):
         dm = "mechanism_short" if "mechanism_short" in dose_df.columns else "mechanism"
-        st.dataframe(dose_df[dose_df[dm].astype(str) == mechanism], use_container_width=True, hide_index=True)
+        st.dataframe(dose_df[dose_df[dm].astype(str) == mechanism], width="stretch", hide_index=True)
 
 with st.expander("Pair-level intervention responses"):
     if not pair_df.empty:
         pcol = "mechanism_short" if "mechanism_short" in pair_df.columns else "mechanism"
         q = pair_df[pair_df[pcol].astype(str) == mechanism] if pcol in pair_df.columns else pair_df
-        st.dataframe(q.head(1500), use_container_width=True, hide_index=True)
+        st.dataframe(q.head(1500), width="stretch", hide_index=True)
 
 st.caption("This is a model-based mechanism-transmission sensitivity analysis, not an experimentally identified do-effect.")
+
+footer()

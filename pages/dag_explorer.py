@@ -9,12 +9,12 @@ from core.loaders import (
     load_path_evidence,
 )
 from core.plotting import dag_figure
-from core.ui import page_header, missing_cache_notice
+from core.ui import page_header, missing_cache_notice, apply_figure_style, footer
 
 page_header(
     "Evidence-calibrated hierarchical graph",
     "Mechanistic DAG Explorer",
-    "默认展示 STEP33 冻结的 DAG-v2 primary；可切换 discovery DAG-v1 与用于机制传递干预的 DAG-v2 core。图是 evidence-audited / mechanism-informed hypothesis graph，不等同于实验已证实的因果 DAG。",
+    "Explore the frozen DAG-v2 graph, compare graph versions, and inspect edge-level evidence. These links are mechanistic hypotheses, not proven causal effects.",
 )
 
 dag_v1 = load_dag_v1()
@@ -48,7 +48,7 @@ selected_edge = (str(selected_row["source"]), str(selected_row["target"]))
 
 left, right = st.columns([1.55, 1])
 with left:
-    st.plotly_chart(dag_figure(edges, selected_edge=selected_edge), use_container_width=True)
+    st.plotly_chart(apply_figure_style(dag_figure(edges, selected_edge=selected_edge)), width="stretch")
 
 with right:
     st.markdown("### Edge evidence")
@@ -74,15 +74,17 @@ with right:
                     st.markdown(f"**{label}**")
                     st.write(row[field])
     else:
-        st.info("该边在 STEP33 edge evidence master 中没有匹配记录。")
+        st.info("No matching evidence record was found for this edge.")
 
 st.markdown("### Current edge table")
 display_cols = [c for c in [
     "source", "target", "edge_type", "status", "evidence_weight",
     "context_dependence", "include_v2_primary", "include_core_intervention",
 ] if c in edges.columns]
-st.dataframe(edges[display_cols] if display_cols else edges, use_container_width=True, hide_index=True)
+st.dataframe(edges[display_cols] if display_cols else edges, width="stretch", hide_index=True)
 
 if not path_evidence.empty:
     with st.expander("Path-level evidence calibration"):
-        st.dataframe(path_evidence, use_container_width=True, hide_index=True)
+        st.dataframe(path_evidence, width="stretch", hide_index=True)
+
+footer()

@@ -4,13 +4,13 @@ import streamlit as st
 
 from core.loaders import load_cells
 from core.plotting import umap_figure, program_bar, PROGRAMS
-from core.ui import page_header, missing_cache_notice
+from core.ui import page_header, missing_cache_notice, apply_figure_style, footer
 
 
 page_header(
     "SEA-AD microglia",
     "Microglia Atlas",
-    "按病理阶段、脑区和 donor 探索小胶质细胞状态空间，并查看五个选定 Program 的活性。",
+    "Explore the microglia state landscape across disease stages, brain regions, and donors, with five selected molecular programs.",
 )
 
 df = load_cells()
@@ -99,17 +99,17 @@ with f4:
         index=color_candidates.index(default_color),
     )
 
-st.caption(f"当前筛选：{len(working):,} 个 web-sampled microglia cells")
+st.caption(f"Current selection: {len(working):,} sampled microglia cells")
 
 left, right = st.columns([1.65, 1])
 
 with left:
     if len(working) == 0:
-        st.warning("当前筛选没有细胞。")
+        st.warning("No cells match the selected filters.")
     else:
         st.plotly_chart(
-            umap_figure(working, color_by),
-            use_container_width=True,
+            apply_figure_style(umap_figure(working, color_by)),
+            width="stretch",
         )
 
 with right:
@@ -122,8 +122,8 @@ with right:
             for p in available_programs
         }
         st.plotly_chart(
-            program_bar(values, title="Mean Program activity"),
-            use_container_width=True,
+            apply_figure_style(program_bar(values, title="Mean program activity")),
+            width="stretch",
         )
 
         program = st.selectbox(
@@ -143,7 +143,7 @@ with right:
         c2.metric("Median", f"{values_numeric.median():.4f}")
         c3.metric("95th pct", f"{values_numeric.quantile(.95):.4f}")
     else:
-        st.info("NMF Program activity 尚未进入 cells_web.parquet。")
+        st.info("Program activity is not available in the current atlas cache.")
 
 st.markdown("### Filtered metadata")
 cols = [
@@ -164,6 +164,8 @@ cols = [
 ]
 st.dataframe(
     working[cols].head(500),
-    use_container_width=True,
+    width="stretch",
     hide_index=True,
 )
+
+footer()
